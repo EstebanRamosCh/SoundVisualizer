@@ -271,3 +271,14 @@ async def analyze_snapshot(req: Request):
         return JSONResponse(analysis_result)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+# --- Endpoint de comprobación de salud para Railway / Cloud ---
+@rt("/health")
+def health_check():
+    return "OK"
+
+
+@rt("/healthz")
+def healthz_check():
+    return "OK"

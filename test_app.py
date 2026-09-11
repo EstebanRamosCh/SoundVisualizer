@@ -23,6 +23,12 @@ def test_full_application():
     assert "canvasPedals" in response.text
     print("[OK] Ruta principal (/) respondio 200 OK con los elementos de FastHTML (incluye Cascada y Rack Pedales).")
 
+    # 1b. Probar ruta de health check
+    res_health = client.get("/health")
+    assert res_health.status_code == 200, f"Fallo en /health: {res_health.status_code}"
+    assert res_health.text == "OK"
+    print("[OK] Ruta de comprobacion de salud (/health) respondio 200 OK.")
+
     # 2. Probar archivos estaticos
     res_css = client.get("/static/css/visualizer.css")
     assert res_css.status_code == 200, "Fallo al servir visualizer.css"
