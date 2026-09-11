@@ -17,7 +17,11 @@ IS_PRODUCTION = bool(
     or os.environ.get("PORT")
     or os.path.exists("/.dockerenv")
 )
-PORT = int(os.environ.get("PORT", 8080))
+raw_port = os.environ.get("PORT", "8080")
+try:
+    PORT = int(raw_port)
+except ValueError:
+    PORT = 8080
 HOST = os.environ.get("HOST", "0.0.0.0")
 
 def open_browser():

@@ -2,3 +2,7 @@ providers = ["python"]
 
 [phases.setup]
 nixPkgs = ["...", "libsndfile", "ffmpeg"]
+
+[start]
+cmd = "python run.py"
+
