@@ -23,6 +23,7 @@ Bienvenido a **BassScope Pro**. Este documento proporciona las directrices de ar
 ├── run.py                   # Script de inicio adaptable (local con navegador / cloud en 0.0.0.0)
 ├── test_app.py              # Suite de pruebas automatizadas con señales sintéticas
 ├── requirements.txt         # Dependencias de Python (optimizadas para despliegues cloud)
+├── Dockerfile               # Configuración de contenedor Docker para despliegue universal
 ├── Procfile                 # Comando de proceso web para Railway / PaaS
 ├── railway.toml             # Configuración de despliegue e infraestructura en Railway
 ├── nixpacks.toml            # Paquetes a nivel de sistema operativo Nix (libsndfile, ffmpeg)
@@ -88,8 +89,8 @@ git push -u origin main
 
 ### Paso 3: Configuración Automática
 Railway detectará automáticamente la configuración gracias a los archivos incluidos:
-* **`railway.toml` & `nixpacks.toml`**: Instalan `libsndfile` y configuran el comando de inicio.
-* **`Procfile`**: Define el worker web `uvicorn main:app --host 0.0.0.0 --port ${PORT:-5001}`.
+* **`Dockerfile` & `railway.toml`**: Configuración estándar de contenedor Docker con Python 3.12 y soporte para audio C (`libsndfile`, `ffmpeg`).
+* **`Procfile` & `nixpacks.toml`**: Compatibilidad adicional con Nixpacks y workers PaaS.
 * **`requirements.txt`**: Instala las dependencias de Python.
 
 ### Paso 4: Habilitar Dominio Público (HTTPS)
