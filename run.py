@@ -11,13 +11,18 @@ import threading
 import uvicorn
 
 # Puerto y Host adaptables (toma variables de entorno en producción como Railway)
-IS_PRODUCTION = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("PORT"))
-PORT = int(os.environ.get("PORT", 5001))
-HOST = os.environ.get("HOST", "0.0.0.0" if IS_PRODUCTION else "127.0.0.1")
+IS_PRODUCTION = bool(
+    os.environ.get("RAILWAY_ENVIRONMENT")
+    or os.environ.get("RAILWAY_STATIC_URL")
+    or os.environ.get("PORT")
+    or os.path.exists("/.dockerenv")
+)
+PORT = int(os.environ.get("PORT", 8080))
+HOST = os.environ.get("HOST", "0.0.0.0")
 
 def open_browser():
     time.sleep(1.2)
-    url = f"http://127.0.0.1:{PORT}"
+    url = f"http://localhost:{PORT}"
     print(f"\n[INFO] Abriendo aplicacion en el navegador: {url}\n")
     try:
         webbrowser.open(url)
