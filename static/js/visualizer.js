@@ -1378,57 +1378,180 @@
       insights.push(`[SEÑAL LIMPIA] Nivel armónico contenido (THD ~${thdPct}), preservando la pureza de la nota fundamental.`);
     }
 
-    // 5. Generar gráfico de forma de onda en canvas offscreen
+    // 5. Generar Figura Completa de 3 Paneles en canvas offscreen (Estilo Studio Rack)
     const offCanvas = document.createElement('canvas');
-    offCanvas.width = 640;
-    offCanvas.height = 280;
+    offCanvas.width = 720;
+    offCanvas.height = 560;
     const ctx = offCanvas.getContext('2d');
 
-    // Fondo Rack Audio
-    ctx.fillStyle = '#0f141c';
-    ctx.fillRect(0, 0, 640, 280);
+    // Fondo general oscuro
+    ctx.fillStyle = '#0f131a';
+    ctx.fillRect(0, 0, 720, 560);
 
-    // Rejilla de osciloscopio
-    ctx.strokeStyle = '#1e293b';
-    ctx.lineWidth = 1;
-    for (let x = 0; x <= 640; x += 40) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 280); ctx.stroke();
-    }
-    for (let y = 0; y <= 280; y += 35) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(640, y); ctx.stroke();
-    }
+    const drawGrid = (x, y, w, h, xSteps, ySteps) => {
+      ctx.fillStyle = '#141923';
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = '#252e40';
+      ctx.lineWidth = 0.7;
+      ctx.setLineDash([2, 3]);
+      for (let i = 1; i < xSteps; i++) {
+        const gx = x + (w / xSteps) * i;
+        ctx.beginPath(); ctx.moveTo(gx, y); ctx.lineTo(gx, y + h); ctx.stroke();
+      }
+      for (let i = 1; i < ySteps; i++) {
+        const gy = y + (h / ySteps) * i;
+        ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x + w, gy); ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      ctx.strokeStyle = '#334155';
+      ctx.strokeRect(x, y, w, h);
+    };
 
-    // Eje central
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.3)';
+    // PANEL 1: Oscilograma (Tiempo / Dinámica / Clipping)
+    const p1X = 35, p1Y = 22, p1W = 655, p1H = 120;
+    drawGrid(p1X, p1Y, p1W, p1H, 10, 4);
+
+    ctx.fillStyle = '#e2e8f0';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.fillText('1. Dominio del Tiempo (Oscilograma de 2.0s - Dinámica y Clipping)', p1X, p1Y - 7);
+
+    // Líneas de Clipping (+0.9 y -0.9)
+    const midY1 = p1Y + p1H / 2;
+    const clipOffset = (p1H / 2) * 0.9;
+    ctx.strokeStyle = '#ef4444';
     ctx.setLineDash([4, 4]);
-    ctx.beginPath(); ctx.moveTo(0, 140); ctx.lineTo(640, 140); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(p1X, midY1 - clipOffset); ctx.lineTo(p1X + p1W, midY1 - clipOffset); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(p1X, midY1 + clipOffset); ctx.lineTo(p1X + p1W, midY1 + clipOffset); ctx.stroke();
     ctx.setLineDash([]);
+    ctx.fillStyle = '#ef4444';
+    ctx.font = '8.5px monospace';
+    ctx.fillText('Límite Clipping (±0.9)', p1X + p1W - 120, midY1 - clipOffset - 3);
 
-    // Dibujar oscilograma de la ráfaga
+    // Onda en verde neón
     ctx.strokeStyle = '#00ff9d';
-    ctx.lineWidth = 1.6;
-    ctx.shadowColor = '#00ff9d';
-    ctx.shadowBlur = 6;
+    ctx.lineWidth = 1.1;
     ctx.beginPath();
-    const step = Math.max(1, Math.floor(samples.length / 640));
-    for (let x = 0; x < 640; x++) {
-      const idx = x * step;
-      const s = samples[idx] || 0;
-      const y = 140 - s * 115;
-      if (x === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
+    const step1 = Math.max(1, Math.floor(samples.length / p1W));
+    for (let px = 0; px < p1W; px++) {
+      const idx = px * step1;
+      const s = Math.max(-1, Math.min(1, samples[idx] || 0));
+      const sy = midY1 - s * (p1H * 0.44);
+      if (px === 0) ctx.moveTo(p1X + px, sy);
+      else ctx.lineTo(p1X + px, sy);
     }
     ctx.stroke();
-    ctx.shadowBlur = 0;
 
-    // Encabezado del gráfico
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = 'bold 11px monospace';
-    ctx.fillText('OSCILOGRAMA CAPTURADO (2.0s WAV) - PROCESAMIENTO WEB AUDIO API', 14, 22);
+    // PANEL 2: Espectrograma STFT (Cascada Frecuencia vs Tiempo)
+    const p2X = 35, p2Y = 180, p2W = 655, p2H = 150;
+    ctx.fillStyle = '#141923';
+    ctx.fillRect(p2X, p2Y, p2W, p2H);
+    ctx.strokeStyle = '#334155';
+    ctx.strokeRect(p2X, p2Y, p2W, p2H);
 
-    ctx.fillStyle = '#38bdf8';
-    ctx.font = '10px monospace';
-    ctx.fillText(`Pico: ${peakDb} dBFS  |  RMS: ${rmsDb} dBFS  |  Crest: ${crestFactor} dB`, 14, 265);
+    ctx.fillStyle = '#e2e8f0';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.fillText('2. Espectrograma STFT (Energía de Frecuencias en el Tiempo - Logarítmico)', p2X, p2Y - 7);
+
+    // Muestreo STFT en tiempo
+    const fMin = 28, fMax = 5000;
+    const imgData = ctx.createImageData(p2W, p2H);
+    const d = imgData.data;
+
+    for (let px = 0; px < p2W; px++) {
+      const sampleIdx = Math.floor((px / p2W) * samples.length);
+      const env = Math.min(1, Math.abs(samples[sampleIdx] || 0) * 1.8 + 0.1);
+
+      for (let py = 0; py < p2H; py++) {
+        const normY = 1 - (py / p2H);
+        const freq = fMin * Math.pow(fMax / fMin, normY);
+
+        let energy = 0;
+        if (state.freqData) {
+          const binWidth = sampleRate / state.fftSize;
+          const bin = Math.round(freq / binWidth);
+          if (bin < state.freqData.length) {
+            const baseDb = state.freqData[bin];
+            const db = baseDb + 20 * Math.log10(env);
+            energy = Math.max(0, Math.min(1, (db + 85) / 70));
+          }
+        }
+
+        const col = getHeatmapColor(energy);
+        const pIdx = (py * p2W + px) * 4;
+        d[pIdx] = col.r;
+        d[pIdx + 1] = col.g;
+        d[pIdx + 2] = col.b;
+        d[pIdx + 3] = 255;
+      }
+    }
+    ctx.putImageData(imgData, p2X, p2Y);
+
+    // Ticks de frecuencia
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.font = '8.5px monospace';
+    const freqsToMark = [50, 100, 250, 500, 1000, 2500];
+    freqsToMark.forEach(f => {
+      const normY = Math.log10(f / fMin) / Math.log10(fMax / fMin);
+      const py = p2Y + p2H - normY * p2H;
+      if (py >= p2Y && py <= p2Y + p2H) {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.setLineDash([2, 4]);
+        ctx.beginPath(); ctx.moveTo(p2X, py); ctx.lineTo(p2X + p2W, py); ctx.stroke();
+        ctx.fillText(`${f}Hz`, p2X + 6, py - 2);
+      }
+    });
+    ctx.setLineDash([]);
+
+    // PANEL 3: Espectro de Potencia y Armónicos (FFT SPAN)
+    const p3X = 35, p3Y = 368, p3W = 655, p3H = 150;
+    drawGrid(p3X, p3Y, p3W, p3H, 10, 4);
+
+    ctx.fillStyle = '#e2e8f0';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.fillText('3. Espectro de Potencia y Armónicos (FFT Promediada)', p3X, p3Y - 7);
+
+    if (state.freqData) {
+      const binWidth = sampleRate / state.fftSize;
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      let first = true;
+      for (let px = 0; px < p3W; px++) {
+        const freq = fMin * Math.pow(fMax / fMin, px / p3W);
+        const bin = Math.round(freq / binWidth);
+        const db = (bin < state.freqData.length) ? state.freqData[bin] : -96;
+        const normDb = Math.max(0, Math.min(1, (db + 96) / 96));
+        const py = p3Y + p3H - normDb * p3H;
+        if (first) { ctx.moveTo(p3X + px, py); first = false; }
+        else ctx.lineTo(p3X + px, py);
+      }
+      ctx.stroke();
+
+      // Marcador Fundamental (Verde) y Armónicos (Ámbar)
+      if (f0 > 25 && f0 < fMax) {
+        const fundPx = (Math.log10(f0 / fMin) / Math.log10(fMax / fMin)) * p3W;
+        ctx.strokeStyle = '#22c55e';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.moveTo(p3X + fundPx, p3Y); ctx.lineTo(p3X + fundPx, p3Y + p3H); ctx.stroke();
+        ctx.fillStyle = '#22c55e';
+        ctx.font = 'bold 9px monospace';
+        ctx.fillText(`f0 (${fundamentalNote}: ${f0.toFixed(1)}Hz)`, p3X + fundPx + 4, p3Y + 14);
+
+        for (let h = 2; h <= 5; h++) {
+          const hF = f0 * h;
+          if (hF < fMax) {
+            const hPx = (Math.log10(hF / fMin) / Math.log10(fMax / fMin)) * p3W;
+            ctx.strokeStyle = 'rgba(245, 158, 11, 0.75)';
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath(); ctx.moveTo(p3X + hPx, p3Y); ctx.lineTo(p3X + hPx, p3Y + p3H); ctx.stroke();
+            ctx.fillStyle = '#f59e0b';
+            ctx.font = '8.5px monospace';
+            ctx.fillText(`${h}x`, p3X + hPx + 2, p3Y + 28);
+          }
+        }
+        ctx.setLineDash([]);
+      }
+    }
 
     const imageBase64 = offCanvas.toDataURL('image/png');
 
@@ -1451,11 +1574,17 @@
     dom.librosaContent.style.display = 'block';
 
     const netlifyNotice = data.isClientOnly ? `
-      <div style="background:rgba(56, 189, 248, 0.08); border:1px solid rgba(56, 189, 248, 0.25); border-radius:8px; padding:10px 14px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+      <div style="background:rgba(56, 189, 248, 0.08); border:1px solid rgba(56, 189, 248, 0.25); border-radius:8px; padding:12px 16px; margin-bottom:14px; display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
         <div>
-          <span style="color:#38bdf8; font-weight:600; font-size:0.85rem;">⚡ Reporte en Navegador (Modo Autónomo Netlify)</span>
-          <div style="font-size:0.75rem; color:#94a3b8; margin-top:3px;">
-            Métricas de dinámica, armónicos y oscilograma procesados con Web Audio API. Para habilitar el espectrograma STFT de Librosa con Python, enlaza un backend en <code>netlify.toml</code>.
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="color:#38bdf8; font-weight:700; font-size:0.88rem;">⚡ Análisis en Navegador (Modo Autónomo Netlify)</span>
+            <span style="background:#0284c7; color:#fff; font-size:0.68rem; padding:2px 6px; border-radius:4px; font-weight:600;">WEB AUDIO API</span>
+          </div>
+          <div style="font-size:0.77rem; color:#94a3b8; margin-top:4px; line-height:1.4;">
+            Oscilograma de 2s, espectrograma STFT y contenido armónico generados en tiempo real con aceleración por hardware en tu dispositivo.
+          </div>
+          <div style="font-size:0.72rem; color:#64748b; margin-top:6px;">
+            💡 <em>Nota técnica</em>: Para computar el gráfico directamente con el backend de Python (Librosa/SciPy), ejecuta <code>python run.py</code> localmente o enlaza un backend de Railway en <code>netlify.toml</code>.
           </div>
         </div>
       </div>
