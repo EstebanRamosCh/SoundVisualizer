@@ -71,7 +71,33 @@ def test_full_application():
     print(f"   - Armonicos detectados: {len(data['harmonics'])}")
     print(f"   - Diagnostico: {data['insights'][0]}")
 
-    print("\nTODAS LAS PRUEBAS PASARON SATISFACTORIAMENTE.")
+    # 4. Probar artefactos y configuracion de despliegue para Netlify
+    from pathlib import Path
+    base_dir = Path(__file__).parent
+    index_html = base_dir / "index.html"
+    netlify_toml = base_dir / "netlify.toml"
+    redirects_file = base_dir / "_redirects"
+
+    assert index_html.exists(), "Falta archivo index.html para Netlify"
+    html_content = index_html.read_text(encoding="utf-8")
+    assert "BassScope Pro" in html_content
+    assert "canvasSpectrum" in html_content
+    assert "canvasOsc" in html_content
+    assert "canvasWaterfall" in html_content
+    assert "canvasPedals" in html_content
+    print("[OK] index.html estatico verificado para despliegue en CDN de Netlify.")
+
+    assert netlify_toml.exists(), "Falta archivo netlify.toml"
+    toml_content = netlify_toml.read_text(encoding="utf-8")
+    assert 'Permissions-Policy = "microphone=*"' in toml_content
+    assert 'publish = "."' in toml_content
+    print("[OK] netlify.toml verificado con cabeceras de microfono (Permissions-Policy).")
+
+    assert redirects_file.exists(), "Falta archivo _redirects"
+    print("[OK] Archivo _redirects presente.")
+
+    print("\nTODAS LAS PRUEBAS (FASTHTML + NETLIFY CDN) PASARON SATISFACTORIAMENTE.")
 
 if __name__ == "__main__":
     test_full_application()
+

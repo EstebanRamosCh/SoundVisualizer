@@ -18,6 +18,10 @@ Bienvenido a **BassScope Pro**. Este documento proporciona las directrices de ar
 ## 📂 2. Mapa de Archivos del Repositorio
 
 ```text
+├── index.html               # Entrypoint estático optimizado para Netlify CDN
+├── netlify.toml             # Configuración de infraestructura, permisos de audio y caché en Netlify
+├── _redirects               # Reglas de redirección de respaldo para Netlify
+├── build_static.py          # Generador de index.html a partir de componentes FastHTML
 ├── main.py                  # Servidor FastHTML: rutas '/', '/api/analyze' y componentes UI
 ├── analyzer.py              # Motor DSP en Python con Librosa, SciPy y Matplotlib
 ├── run.py                   # Script de inicio adaptable (local con navegador / cloud en 0.0.0.0)
@@ -98,6 +102,20 @@ Railway detectará automáticamente la configuración gracias a los archivos inc
 2. En la sección **"Networking"**, haz clic en **"Generate Domain"**.
 3. Railway asignará una URL con certificado SSL gratuito (por ejemplo: `https://bassscope-production.up.railway.app`).
 4. Abre la URL generada: el navegador solicitará permiso de micrófono/interfaz de audio en un contexto seguro HTTPS y la aplicación estará lista para funcionar en cualquier computador o celular en el mundo.
+
+---
+
+## 🌐 4.1. Procedimiento de Despliegue en Netlify
+
+Para desplegar en **Netlify** (ideal para CDN estático ultrarrápido y HTTPS automático):
+
+1. Conecta tu repositorio de GitHub en el panel de **Netlify** ("Import an existing project").
+2. Netlify detectará `netlify.toml`:
+   - **Publish directory**: `.`
+   - **Build command**: *(dejar en blanco o `python build_static.py`)*
+3. La configuración inyecta automáticamente la cabecera `Permissions-Policy: microphone=*` para que los navegadores autoricen la captura del bajo.
+4. **Modo Autónomo**: Todas las 5 vistas visuales, telemetría y afinador operan a 60 FPS con Web Audio API sin necesidad de backend. El botón de instantánea ofrece diagnóstico dinámico en el cliente.
+5. **Modo Híbrido**: Si se desea calcular STFT con Librosa en Python, se despliega el backend en Railway y se activa la regla de proxy en `netlify.toml`.
 
 ---
 

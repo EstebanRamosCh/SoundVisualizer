@@ -1,0 +1,42 @@
+# ==============================================================================
+# BassScope Pro - Configuración de Despliegue en Netlify
+# ==============================================================================
+
+[build]
+  # Directorio a publicar en la CDN de Netlify
+  publish = "."
+  # Si deseas que Netlify regenere el HTML en cada push usando Python:
+  # command = "python build_static.py"
+
+[build.environment]
+  PYTHON_VERSION = "3.12"
+
+# Cabeceras globales de seguridad y permisos de hardware
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    # Permiso obligatorio para habilitar entrada de micrófono e interfaces de audio USB
+    Permissions-Policy = "microphone=*"
+
+# Optimización de entrega y caché de recursos estáticos
+[[headers]]
+  for = "/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Modo Híbrido (Opcional): Proxy transparente hacia backend de Python (Railway/Render)
+# Descomenta y ajusta la URL si conectas un backend para el análisis STFT con Librosa:
+# [[redirects]]
+#   from = "/api/*"
+#   to = "https://tu-backend.up.railway.app/api/:splat"
+#   status = 200
+#   force = true
+
+# Fallback para rutas limpias
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

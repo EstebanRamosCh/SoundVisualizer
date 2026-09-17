@@ -103,15 +103,67 @@ Cuando encuentres un tono que desees estudiar a fondo:
 
 ---
 
+## ☁️ Despliegue en Netlify
+
+**BassScope Pro** está optimizado para desplegarse de manera inmediata en la red CDN global de **Netlify** con certificado SSL/HTTPS automático (indispensable para que los navegadores otorguen permiso de acceso a la interfaz de audio o micrófono).
+
+### Paso 1: Subir el proyecto a GitHub
+Asegúrate de que tus últimos cambios estén en tu repositorio de GitHub:
+```bash
+git add .
+git commit -m "feat: soporte completo para despliegue en Netlify"
+git push origin main
+```
+
+### Paso 2: Crear el Sitio en Netlify
+1. Ingresa a tu cuenta en [Netlify](https://app.netlify.com/).
+2. Haz clic en **"Add new site"** $\rightarrow$ **"Import an existing project"**.
+3. Selecciona tu proveedor (**GitHub**) y escoge el repositorio de **BassScope Pro**.
+
+### Paso 3: Configuración de Construcción
+Netlify detectará automáticamente el archivo `netlify.toml` incluido en el proyecto:
+* **Base directory**: *(dejar en blanco / raíz)*
+* **Build command**: *(dejar en blanco o `python build_static.py` si deseas regenerar)*
+* **Publish directory**: `.`
+
+Haz clic en **"Deploy BassScope Pro"**. En menos de 10 segundos tu visualizador estará en línea en todo el mundo.
+
+### 🎛️ Modos de Operación en Netlify:
+* **Modo 1 (Autónomo en Netlify - Recomendado)**:
+  - **Latencia Cero y Costo Cero**: Las 5 vistas en tiempo real (`Espectro FFT`, `Osciloscopio`, `Doble Vista`, `Cascada STFT`, `Laboratorio de Pedales`), el afinador cromático, la retención de picos y la curva $\Delta\text{EQ}$ se ejecutan 100% en el navegador del usuario a 60 FPS mediante la **Web Audio API**.
+  - Al pulsar *Analizar Instantánea*, la aplicación genera un diagnóstico dinámico y oscilograma directamente en el cliente.
+* **Modo 2 (Híbrido con Backend Librosa en Railway/Render)**:
+  - Si deseas calcular espectrogramas STFT profundos en Python con Librosa, despliega el contenedor en Railway (usando el `Dockerfile` incluido).
+  - En `netlify.toml`, descomenta las líneas de proxy hacia tu backend:
+    ```toml
+    [[redirects]]
+      from = "/api/*"
+      to = "https://tu-backend.up.railway.app/api/:splat"
+      status = 200
+      force = true
+    ```
+  - Netlify redirigirá las llamadas de `/api/analyze` a tu servidor de Railway sin problemas de CORS.
+
+---
+
 ## 📁 Estructura del Código
 
 ```text
+├── index.html               # Entrypoint estático optimizado para Netlify CDN
+├── netlify.toml             # Configuración de despliegue, permisos de micrófono y caché en Netlify
+├── _redirects               # Reglas de redirección de respaldo para Netlify
+├── build_static.py          # Generador de index.html a partir de componentes FastHTML
 ├── main.py                  # Aplicación FastHTML (Rutas, UI y endpoint /api/analyze)
 ├── analyzer.py              # Motor de análisis DSP en Python (Librosa, SciPy, Matplotlib)
-├── run.py                   # Script de ejecución con apertura automática del navegador
+├── run.py                   # Script de ejecución local adaptable
 ├── test_app.py              # Suite de pruebas automatizadas con señales sintéticas
 ├── requirements.txt         # Dependencias del entorno Python
+├── Dockerfile               # Contenedor para despliegues cloud (Railway / PaaS)
+├── Procfile                 # Comando web para Railway / PaaS
+├── railway.toml             # Configuración de infraestructura en Railway
+├── nixpacks.toml            # Paquetes a nivel de sistema operativo Nix (libsndfile, ffmpeg)
 └── static/
     ├── css/visualizer.css   # Estilo oscuro profesional de audio de alta precisión
     └── js/visualizer.js     # Motor Web Audio API (FFT, osciloscopio y render Canvas 60 FPS)
 ```
+

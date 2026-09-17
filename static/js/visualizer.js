@@ -1291,20 +1291,175 @@
         });
 
         if (!resp.ok) {
-          throw new Error(await resp.text());
+          throw new Error(`HTTP ${resp.status}`);
         }
 
         const data = await resp.json();
+        if (data.error) {
+          throw new Error(data.error);
+        }
         displayLibrosaResults(data);
       } catch (e) {
-        dom.librosaLoading.innerHTML = `<p style="color:#ef4444;">Error en el servidor: ${e.message}</p>`;
+        // En despliegue autónomo de Netlify o si el backend Python está apagado,
+        // generar el diagnóstico dinámico y oscilograma en el cliente sin error:
+        console.warn("Backend /api/analyze no disponible, generando diagnóstico en el cliente para Netlify:", e);
+        displayClientSideSnapshotReport(merged, sampleRate);
       }
     };
+  }
+
+  function displayClientSideSnapshotReport(samples, sampleRate) {
+    // 1. Dinámica y factor de cresta de la señal capturada
+    let peakVal = 0;
+    let sumSq = 0;
+    for (let i = 0; i < samples.length; i++) {
+      const abs = Math.abs(samples[i]);
+      if (abs > peakVal) peakVal = abs;
+      sumSq += samples[i] * samples[i];
+    }
+    const rmsVal = Math.sqrt(sumSq / (samples.length || 1)) + 1e-6;
+    const peakDb = Math.max(-96, 20 * Math.log10(peakVal + 1e-6)).toFixed(1);
+    const rmsDb = Math.max(-96, 20 * Math.log10(rmsVal)).toFixed(1);
+    const crestFactor = Math.max(0, peakDb - rmsDb).toFixed(1);
+
+    // 2. Fundamental y nota detectada
+    const fundamentalNote = dom.livePeakNote && dom.livePeakNote.textContent !== '--' 
+      ? dom.livePeakNote.textContent 
+      : (state.peakNote || 'N/A');
+    const fundamentalHz = dom.livePeakFreq && dom.livePeakFreq.textContent !== '-- Hz'
+      ? dom.livePeakFreq.textContent
+      : (state.peakFreq > 0 ? `${state.peakFreq.toFixed(1)} Hz` : 'N/A');
+
+    // 3. Estimar THD y armónicos si están disponibles
+    let thdPct = '0.0%';
+    const harmonics = [];
+    const f0 = parseFloat(fundamentalHz);
+    if (!isNaN(f0) && f0 > 25 && state.freqData) {
+      const binWidth = sampleRate / state.fftSize;
+      const f0Bin = Math.round(f0 / binWidth);
+      const f0Mag = f0Bin < state.freqData.length ? state.freqData[f0Bin] : -50;
+
+      let harmonicPowerSum = 0;
+      for (let h = 2; h <= 6; h++) {
+        const targetF = f0 * h;
+        if (targetF < sampleRate / 2) {
+          const hBin = Math.round(targetF / binWidth);
+          if (hBin < state.freqData.length) {
+            const hDb = state.freqData[hBin];
+            const relDb = (hDb - f0Mag).toFixed(1);
+            const linearRel = Math.pow(10, (hDb - f0Mag) / 20);
+            harmonicPowerSum += linearRel * linearRel;
+            harmonics.push({
+              harmonic: `${h}x (${findClosestBassNote(targetF)})`,
+              freq: `${targetF.toFixed(1)} Hz`,
+              relative_db: `${relDb > 0 ? '+' : ''}${relDb} dB`
+            });
+          }
+        }
+      }
+      const thd = Math.min(100, Math.sqrt(harmonicPowerSum) * 100);
+      thdPct = `${thd.toFixed(1)}%`;
+    }
+
+    // 4. Diagnóstico de pedales
+    const insights = [];
+    const crestNum = parseFloat(crestFactor);
+    if (crestNum < 8.0) {
+      insights.push(`[COMPRESIÓN ALTA / SATURACIÓN] El factor de cresta es bajo (~${crestFactor} dB), indicando que un pedal compresor o saturador está recortando o conteniendo los picos dinámicos.`);
+    } else if (crestNum > 14.0) {
+      insights.push(`[DINÁMICA AMPLIA / BYPASS] El factor de cresta es elevado (~${crestFactor} dB), típico de una señal limpia con rango dinámico completo.`);
+    } else {
+      insights.push(`[DINÁMICA BALANCEADA] Factor de cresta moderado (~${crestFactor} dB), respuesta natural entre ataque y sostenido.`);
+    }
+
+    if (parseFloat(thdPct) > 18.0) {
+      insights.push(`[DISTORSIÓN / OVERDRIVE DETECTADO] Alto contenido de sobretonos armónicos (THD ~${thdPct}), característico de saturación, fuzz o distorsión.`);
+    } else {
+      insights.push(`[SEÑAL LIMPIA] Nivel armónico contenido (THD ~${thdPct}), preservando la pureza de la nota fundamental.`);
+    }
+
+    // 5. Generar gráfico de forma de onda en canvas offscreen
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = 640;
+    offCanvas.height = 280;
+    const ctx = offCanvas.getContext('2d');
+
+    // Fondo Rack Audio
+    ctx.fillStyle = '#0f141c';
+    ctx.fillRect(0, 0, 640, 280);
+
+    // Rejilla de osciloscopio
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= 640; x += 40) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 280); ctx.stroke();
+    }
+    for (let y = 0; y <= 280; y += 35) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(640, y); ctx.stroke();
+    }
+
+    // Eje central
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.3)';
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(0, 140); ctx.lineTo(640, 140); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Dibujar oscilograma de la ráfaga
+    ctx.strokeStyle = '#00ff9d';
+    ctx.lineWidth = 1.6;
+    ctx.shadowColor = '#00ff9d';
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    const step = Math.max(1, Math.floor(samples.length / 640));
+    for (let x = 0; x < 640; x++) {
+      const idx = x * step;
+      const s = samples[idx] || 0;
+      const y = 140 - s * 115;
+      if (x === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Encabezado del gráfico
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = 'bold 11px monospace';
+    ctx.fillText('OSCILOGRAMA CAPTURADO (2.0s WAV) - PROCESAMIENTO WEB AUDIO API', 14, 22);
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = '10px monospace';
+    ctx.fillText(`Pico: ${peakDb} dBFS  |  RMS: ${rmsDb} dBFS  |  Crest: ${crestFactor} dB`, 14, 265);
+
+    const imageBase64 = offCanvas.toDataURL('image/png');
+
+    displayLibrosaResults({
+      image_base64: imageBase64,
+      fundamental_note: fundamentalNote,
+      fundamental_hz: fundamentalHz,
+      thd_percent: thdPct,
+      crest_factor: `${crestFactor} dB`,
+      peak_db: `${peakDb} dB`,
+      rms_db: `${rmsDb} dB`,
+      insights: insights,
+      harmonics: harmonics,
+      isClientOnly: true
+    });
   }
 
   function displayLibrosaResults(data) {
     dom.librosaLoading.style.display = 'none';
     dom.librosaContent.style.display = 'block';
+
+    const netlifyNotice = data.isClientOnly ? `
+      <div style="background:rgba(56, 189, 248, 0.08); border:1px solid rgba(56, 189, 248, 0.25); border-radius:8px; padding:10px 14px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+        <div>
+          <span style="color:#38bdf8; font-weight:600; font-size:0.85rem;">⚡ Reporte en Navegador (Modo Autónomo Netlify)</span>
+          <div style="font-size:0.75rem; color:#94a3b8; margin-top:3px;">
+            Métricas de dinámica, armónicos y oscilograma procesados con Web Audio API. Para habilitar el espectrograma STFT de Librosa con Python, enlaza un backend en <code>netlify.toml</code>.
+          </div>
+        </div>
+      </div>
+    ` : '';
 
     let harmonicsHtml = '';
     if (data.harmonics && data.harmonics.length > 0) {
@@ -1334,6 +1489,7 @@
     }
 
     dom.librosaContent.innerHTML = `
+      ${netlifyNotice}
       <div class="librosa-report-grid">
         <div style="text-align:center;">
           <img src="${data.image_base64}" alt="Librosa Analysis" style="max-width:100%; border-radius:8px; border:1px solid #273142; box-shadow:0 8px 24px rgba(0,0,0,0.6);" />

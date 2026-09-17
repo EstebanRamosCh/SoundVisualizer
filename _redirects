@@ -1,0 +1,8 @@
+# Netlify Redirects File
+# Reglas de redirección de respaldo para despliegues en Netlify
+
+# Modo Híbrido: Proxy para backend de Librosa (descomentar y colocar URL de Railway si aplica)
+# /api/*  https://tu-backend.up.railway.app/api/:splat  200!
+
+# SPA / Fallback a index.html
+/*    /index.html   200

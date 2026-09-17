@@ -1,0 +1,124 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.7/dist/htmx.js"></script><script src="https://cdn.jsdelivr.net/gh/answerdotai/fasthtml-js@1.0.12/fasthtml.js"></script><script src="https://cdn.jsdelivr.net/gh/answerdotai/surreal@main/surreal.js"></script><script src="https://cdn.jsdelivr.net/gh/gnat/css-scope-inline@main/script.js"></script>    <title>BassScope Pro | Analizador de Frecuencias y Pedales para Bajo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <link rel="stylesheet" href="/static/css/visualizer.css">
+<script src="/static/js/visualizer.js" defer></script>  </head>
+  <body>
+    <div>
+      <header class="top-header">
+        <div class="brand">
+          <div class="brand-icon">🎸</div>
+          <div>
+            <h1 class="brand-title">BassScope Pro</h1>
+<span class="brand-subtitle">Analizador de Frecuencias &amp; Pedales Análogos (Estilo SPAN)</span>          </div>
+        </div>
+        <div class="header-controls">
+<select id="audioSource" class="custom-select" name="audioSource"><option value="">Buscando dispositivos de audio...</option></select><button id="btnStart" class="btn btn-primary" name="btnStart">🎤 Conectar Bajo</button><button disabled id="btnFreeze" class="btn btn-secondary" name="btnFreeze">⏸ Congelar</button>          <div class="status-pill">
+<span id="statusLed" class="status-led"></span><span id="statusText">DESCONECTADO</span>          </div>
+        </div>
+      </header>
+<main class="main-container">        <section class="visualizer-section">
+          <div class="display-rack">
+            <div class="rack-toolbar">
+              <div class="view-tabs">
+<button id="tabSpectrum" class="view-tab active" name="tabSpectrum">Espectro FFT (SPAN)</button><button id="tabOsc" class="view-tab" name="tabOsc">Osciloscopio (Tiempo)</button><button id="tabBoth" class="view-tab" name="tabBoth">Doble Vista (Ambos)</button><button id="tabWaterfall" class="view-tab" name="tabWaterfall">Cascada STFT (3D/2D)</button><button id="tabPedals" class="view-tab" name="tabPedals">Laboratorio de Pedales</button>              </div>
+              <div class="toolbar-actions">
+<select id="freqRangeSelect" class="custom-select" name="freqRangeSelect"><option value="full">Rango Completo (20 Hz - 20 kHz)</option><option value="bass">Zoom Bajos (20 Hz - 2.5 kHz)</option></select><button disabled id="btnSaveRef" class="btn btn-secondary" name="btnSaveRef">💾 Guardar Ref. A</button><button id="btnToggleDelta" class="btn btn-secondary" title="Mostrar Curva Diferencial de Ecualización" style="display:none; font-size:0.75rem;" name="btnToggleDelta">Δ Curva EQ</button><button id="btnClearRef" class="btn btn-secondary" style="display:none;" name="btnClearRef">✕ Quitar Ref.</button><button disabled id="btnResetPeak" class="btn btn-secondary" name="btnResetPeak">↺ Reset Picos</button>              </div>
+            </div>
+            <div class="canvas-container">
+<canvas id="canvasSpectrum"></canvas><canvas id="canvasOsc" class="canvas-oscilloscope"></canvas><canvas id="canvasWaterfall" style="display:none;"></canvas><canvas id="canvasPedals" style="display:none;"></canvas>              <div id="canvasTooltip" class="canvas-tooltip"></div>
+            </div>
+            <div class="legend-bar">
+              <div class="legend-item">
+                <div class="legend-color" style="background:#00ff9d;"></div>
+<span>Señal Activa</span>              </div>
+              <div class="legend-item">
+                <div class="legend-color" style="background:#f59e0b;"></div>
+<span>Retención de Picos (Peak Hold)</span>              </div>
+              <div class="legend-item">
+                <div class="legend-color" style="background:#38bdf8; border-top: 1px dashed #38bdf8;"></div>
+<span>Referencia Bypass A/B</span>              </div>
+              <div class="legend-item">
+                <div class="legend-color" style="background:#ec4899;"></div>
+<span>Curva Δ EQ</span>              </div>
+              <div class="legend-item">
+                <div class="legend-color" style="background:#38bdf8; opacity:0.5;"></div>
+<span>Notas de Bajo</span>              </div>
+              <div class="legend-item">
+                <div class="legend-color" style="background:#ef4444;"></div>
+<span>Límite Clipping</span>              </div>
+            </div>
+          </div>
+          <div class="telemetry-rack">
+            <div class="telemetry-card">
+<span class="telemetry-label">Frecuencia Pico / Nota</span><span id="livePeakFreq" class="telemetry-value">-- Hz</span><span id="livePeakNote" class="telemetry-sub">Nota: --</span>            </div>
+            <div class="telemetry-card">
+<span class="telemetry-label">Nivel RMS (Volumen Efectivo)</span><span id="liveRms" class="telemetry-value">-- dB</span>              <div class="meter-wrapper" style="margin-top:6px;">
+                <div id="meterRmsFill" class="meter-fill"></div>
+              </div>
+            </div>
+            <div class="telemetry-card">
+<span class="telemetry-label">Nivel Pico (Peak Level)</span><span id="livePeak" class="telemetry-value">-- dB</span><span class="telemetry-sub">Margen antes de saturar</span>            </div>
+            <div class="telemetry-card">
+<span class="telemetry-label">Factor de Cresta (Compresión)</span><span id="liveCrest" class="telemetry-value">-- dB</span><span class="telemetry-sub">Menor valor = Mayor compresión</span>            </div>
+          </div>
+        </section>
+        <section class="controls-sidebar">
+          <div class="control-panel">
+            <div class="panel-title">⚙ Configuración de Señal</div>
+            <div class="control-group">
+              <div class="control-label">
+<span>Ganancia de Entrada (Preamp)</span><span id="gainVal" class="val">1.0x</span>              </div>
+              <input type="range" min="0.5" max="4.0" step="0.1" value="1.0" id="gainSlider" name="gainSlider">
+            </div>
+            <div class="control-group">
+              <div class="control-label">
+<span>Resolución FFT (Tamaño de Bloque)</span>              </div>
+<select id="fftSelect" class="custom-select" style="width:100%; max-width:none;" name="fftSelect"><option value="1024">1024 puntos (Rápido)</option><option value="2048">2048 puntos (Estándar)</option><option value="4096" selected>4096 puntos (Óptimo para Bajo)</option><option value="8192">8192 puntos (Ultra Alta Definición)</option><option value="16384">16384 puntos (Máximo Detalle Subgraves)</option></select>            </div>
+            <div class="control-group">
+              <div class="control-label">
+<span>Suavizado Espectral (Inercia)</span><span id="smoothVal" class="val">0.80</span>              </div>
+              <input type="range" min="0.0" max="0.95" step="0.05" value="0.80" id="smoothSlider" name="smoothSlider">
+            </div>
+            <div class="control-group">
+              <div class="control-label">
+<span>Piso de Ruido (Min dB)</span><span id="minDbVal" class="val">-96 dB</span>              </div>
+              <input type="range" min="-120" max="-48" step="6" value="-96" id="minDbSlider" name="minDbSlider">
+            </div>
+          </div>
+          <div class="control-panel">
+            <div class="panel-title">💡 Interpretación de Pedales</div>
+            <div style="font-size:0.75rem; line-height:1.6; color:#94a3b8; display:flex; flex-direction:column; gap:8px;">
+              <p>
+• <span style="color:#38bdf8; font-weight:600;">Compresor: </span>Fíjate en el Factor de Cresta. Al activar el pedal, el factor de cresta se reduce (6-8 dB) y los picos en el osciloscopio se aplanan sin dispararse.              </p>
+              <p>
+• <span style="color:#f59e0b; font-weight:600;">Overdrive / Fuzz: </span>En el espectro FFT verás aparecer espigas en los armónicos múltiplos (2x, 3x, 4x) y en el osciloscopio la onda se recortará en la parte superior/inferior.              </p>
+              <p>
+• <span style="color:#00ff9d; font-weight:600;">EQ / Preamp: </span>Guarda una curva de referencia en 'Bypass' y luego activa el pedal. Compara visualmente la curva activa contra la línea punteada.              </p>
+            </div>
+          </div>
+          <div class="control-panel" style="background: linear-gradient(180deg, #181c26 0%, #131720 100%); border-color: #3b2d54;">
+<button disabled id="btnSnapshot" class="btn btn-accent" style="width: 100%; justify-content: center; padding: 12px; font-size: 0.95rem;" name="btnSnapshot">🔬 Analizar Instantánea con Librosa</button>            <p style="font-size:0.72rem; color:#64748b; text-align:center; margin-top:8px;">Graba 2 segundos en alta fidelidad y genera el reporte con espectrograma STFT, distorsión THD y armónicos en Python.</p>
+          </div>
+        </section>
+</main>      <div id="modalLibrosa" class="modal-overlay">
+        <div class="modal-content">
+          <div class="modal-header">
+            <div class="modal-title">🔬 Análisis Espectral y Diagnóstico de Pedal (Librosa)</div>
+<button id="modalClose" class="modal-close" name="modalClose">✕</button>          </div>
+          <div class="modal-body">
+            <div id="librosaLoading" style="text-align:center; padding:40px;">
+              <div style="font-size:1.1rem; color:#38bdf8; margin-bottom:8px;">Procesando señal con Librosa y SciPy...</div>
+              <p style="color:#94a3b8; font-size:0.85rem;">Calculando Transformada de Fourier de Tiempo Corto (STFT), armónicos y dinámica...</p>
+            </div>
+            <div id="librosaContent" style="display:none;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
